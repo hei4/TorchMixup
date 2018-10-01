@@ -61,5 +61,73 @@ class Classifier(nn.Module):
         return x
 
 
+class Generator(nn.Module):
+    def __init__(self, nz=100, ng_ch=64, nch=3):
+        super(Generator, self).__init__()
+
+        self.layers = nn.ModuleDict({
+            'layer0': nn.Sequential(
+                nn.ConvTranspose2d(nz, ng_ch * 8, 4, 1, 0),
+                nn.BatchNorm2d(ng_ch * 8),
+                nn.ReLU()
+            ),  # (N, 100, 1, 1) -> (N, ng_ch*8, 4, 4)
+            'layer1': nn.Sequential(
+                nn.ConvTranspose2d(ng_ch * 8, ng_ch * 4, 4, 2, 1),
+                nn.BatchNorm2d(ng_ch * 4),
+                nn.ReLU()
+            ),  # (N, ng_ch*8, 4, 4) -> (N, ng_ch*4, 8, 8)
+            'layer2': nn.Sequential(
+                nn.ConvTranspose2d(ng_ch * 4, ng_ch * 2, 4, 2, 1),
+                nn.BatchNorm2d(ng_ch * 2),
+                nn.ReLU()
+            ),  # (N, ng_ch*4, 8, 8) -> (N, ng_ch*2, 16, 16)
+
+            'layer3': nn.Sequential(
+                nn.ConvTranspose2d(ng_ch * 2, ng_ch, 4, 2, 1),
+                nn.BatchNorm2d(ng_ch),
+                nn.ReLU()
+            ),  # (N, ng_ch*2, 16, 16) -> (N, ng_ch, 32, 32)
+            'layer4': nn.Sequential(
+                nn.ConvTranspose2d(ng_ch, nch, 4, 2, 1),
+                nn.Tanh()
+            )   # (N, ng_ch, 32, 32) -> (N, nch, 64, 64)
+        })
+
+    def forward(self, x):
+        for layer in self.layers.values():
+            x = layer(x)
+        return x
 
 
+class Discriminator(nn.Module):
+    def __init__(self, nch=3, nd_ch=64):
+        super(Discriminator, self).__init__()
+
+        self.layers = nn.ModuleDict({
+            'layer0': nn.Sequential(
+                nn.Conv2d(nch, nd_ch, 4, 2, 1),
+                nn.LeakyReLU(negative_slope=0.2)
+            ),  # (N, nch, 64, 64) -> (N, nd_ch, 32, 32)
+            'layer1': nn.Sequential(
+                nn.Conv2d(nd_ch, nd_ch * 2, 4, 2, 1),
+                nn.BatchNorm2d(nd_ch * 2),
+                nn.LeakyReLU(negative_slope=0.2)
+            ),  # (N, nd_ch, 32, 32) -> (N, nd_ch*2, 16, 16)
+            'layer2': nn.Sequential(
+                nn.Conv2d(nd_ch * 2, nd_ch * 4, 4, 2, 1),
+                nn.BatchNorm2d(nd_ch * 4),
+                nn.LeakyReLU(negative_slope=0.2)
+            ),  # (N, nd_ch*2, 16, 16) -> (N, nd_ch*4, 8, 8)
+            'layer3': nn.Sequential(
+                nn.Conv2d(nd_ch * 4, nd_ch * 8, 4, 2, 1),
+                nn.BatchNorm2d(nd_ch * 8),
+                nn.LeakyReLU(negative_slope=0.2)
+            ),  # (N, nd_ch*4, 8, 8) -> (N, ng_ch*8, 4, 4)
+            'layer4': nn.Conv2d(nd_ch * 8, 1, 4, 1, 0)
+            # (N, nd_ch*8, 4, 4) -> (N, ng_ch*8, 1, 1)
+        })
+
+    def forward(self, x):
+        for layer in self.layers.values():
+            x = layer(x)
+        return x.view(-1, 1).squeeze(1)
