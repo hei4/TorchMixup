@@ -20,13 +20,16 @@ def main():
     parser.add_argument('--nz', type=int, default=100, help='size of the latent z vector')
     parser.add_argument('--ng_ch', type=int, default=64)
     parser.add_argument('--nd_ch', type=int, default=64)
-    parser.add_argument('--n_epoch', type=int, default=50, help='number of epochs to train for')
+    parser.add_argument('--epoch', type=int, default=50, help='number of epochs to train for')
     parser.add_argument('--lr', type=float, default=0.0002, help='learning rate, default=0.0002')
     parser.add_argument('--beta1', type=float, default=0.5, help='beta1 for adam. default=0.5')
     parser.add_argument('--outf', default='./result', help='folder to output images and model checkpoints')
 
     opt = parser.parse_args()
     print(opt)
+
+    batch_size = opt.batch
+    epoch_size = opt.epoch
 
     try:
         os.makedirs(opt.outf)
@@ -44,7 +47,7 @@ def main():
                             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
                         ]))
 
-    dataloader = torch.utils.data.DataLoader(dataset[:50000], batch_size=opt.batch,
+    dataloader = torch.utils.data.DataLoader(dataset[:50000], batch_size=batch_size,
                                              shuffle=True, num_workers=int(opt.workers))
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -62,7 +65,7 @@ def main():
 
     criterion = nn.MSELoss()    # criterion = nn.BCELoss()
 
-    fixed_noise = torch.randn(opt.batch, nz, 1, 1, device=device)
+    fixed_noise = torch.randn(batch_size, nz, 1, 1, device=device)
     real_label = 1
     fake_label = 0
 
@@ -70,7 +73,7 @@ def main():
     optimizerD = optim.Adam(netD.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999), weight_decay=1e-5)
     optimizerG = optim.Adam(netG.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999), weight_decay=1e-5)
 
-    for epoch in range(opt.n_epoch):
+    for epoch in range(epoch_size):
         for itr, data in enumerate(dataloader):
             ############################
             # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
@@ -78,9 +81,9 @@ def main():
             # train with real
             netD.zero_grad()
             real_image = data[0].to(device)
-
-            batch_size = real_image.size(0)
-            label = torch.full((batch_size,), real_label, device=device)
+            
+            sample_size = real_image.size(0)
+            label = torch.full((sample_size,), real_label, device=device)
 
             output = netD(real_image)
             errD_real = criterion(output, label)
@@ -88,7 +91,7 @@ def main():
             D_x = output.mean().item()
 
             # train with fake
-            noise = torch.randn(batch_size, nz, 1, 1, device=device)
+            noise = torch.randn(sample_size, nz, 1, 1, device=device)
             fake_image = netG(noise)
             label.fill_(fake_label)
             output = netD(fake_image.detach())

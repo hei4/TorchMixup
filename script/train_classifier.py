@@ -27,7 +27,7 @@ def main():
     display_interval = args.display
 
     train_trans = transforms.Compose([
-        transforms.RandomVerticalFlip(),
+        transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),    # transform to torch.Tensor
         transforms.Normalize(mean=(0.5,), std=(0.5,))
     ])
@@ -52,8 +52,11 @@ def main():
     net.to(device)  # for GPU
 
     criterion = nn.CrossEntropyLoss()
+
     # optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
     optimizer = optim.Adam(net.parameters(), lr=0.001)
+
+
 
     epoch_list = []
     train_acc_list = []

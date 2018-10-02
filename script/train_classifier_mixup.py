@@ -36,7 +36,7 @@ def main():
     display_interval = args.display
 
     train_trans = transforms.Compose([
-        transforms.RandomVerticalFlip(),
+        transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),    # transform to torch.Tensor
         transforms.Normalize(mean=(0.5,), std=(0.5,))
     ])

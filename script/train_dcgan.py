@@ -63,60 +63,60 @@ def main():
     netD.apply(weights_init)
     print(netD)
 
-    criterion = nn.MSELoss()    # criterion = nn.BCELoss()
+    criterion = nn.BCEWithLogitsLoss()
 
     fixed_noise = torch.randn(batch_size, nz, 1, 1, device=device)
+    real_label = 1
+    fake_label = 0
 
     # setup optimizer
     optimizerD = optim.Adam(netD.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999), weight_decay=1e-5)
     optimizerG = optim.Adam(netG.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999), weight_decay=1e-5)
 
-    beta_dist = torch.distributions.beta.Beta(0.2, 0.2)
-
     for epoch in range(epoch_size):
         for itr, data in enumerate(dataloader):
-            real_image = data[0].to(device)
-            sample_size = real_image.size(0)
-            noise = torch.randn(sample_size, nz, 1, 1, device=device)            
-        
-            mix_label = beta_dist.sample((sample_size, )).to(device)
-            mix_rate = mix_label.reshape(sample_size, 1, 1, 1)
-        
             ############################
             # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
             ###########################
             # train with real
             netD.zero_grad()
+            real_image = data[0].to(device)
             
+            sample_size = real_image.size(0)
+            label = torch.full((sample_size,), real_label, device=device)
+
+            output = netD(real_image)
+            errD_real = criterion(output, label)
+            errD_real.backward()
+            D_x = output.mean().item()
+
+            # train with fake
+            noise = torch.randn(sample_size, nz, 1, 1, device=device)
             fake_image = netG(noise)
-            mix_image = mix_rate * real_image + (1. - mix_rate) * fake_image            
+            label.fill_(fake_label)
+            output = netD(fake_image.detach())
 
-            output = netD(mix_image)
-            errD = criterion(output, mix_label)
-            errD.backward()
+            errD_fake = criterion(output, label)
+            errD_fake.backward()
+            D_G_z1 = output.mean().item()
+            errD = errD_real + errD_fake
             optimizerD.step()
-
-            D_mix1 = output.mean().item()
 
             ############################
             # (2) Update G network: maximize log(D(G(z)))
             ###########################
             netG.zero_grad()
-
-            fake_image = netG(noise)
-            mix_image = mix_rate * real_image + (1. - mix_rate) * fake_image
-
-            output = netD(mix_image)
-            errG = criterion(output, 1. - mix_label)
+            label.fill_(real_label)  # fake labels are real for generator cost
+            output = netD(fake_image)
+            errG = criterion(output, label)
             errG.backward()
+            D_G_z2 = output.mean().item()
             optimizerG.step()
 
-            D_mix2 = output.mean().item()
-
-            print('[{}/{}][{}/{}] Loss_D: {:.3f} Loss_G: {:.3f} D(mix): {:.3f}/{:.3f}'
+            print('[{}/{}][{}/{}] Loss_D: {:.3f} Loss_G: {:.3f} D(x): {:.3f} D(G(z)): {:.3f}/{:.3f}'
                   .format(epoch + 1, epoch_size,
                           itr + 1, len(dataloader),
-                          errD.item(), errG.item(), D_mix1, D_mix2))
+                          errD.item(), errG.item(), D_x, D_G_z1, D_G_z2))
 
             if epoch == 0 and itr == 0:
                 vutils.save_image(real_image, '{}/real_samples.png'.format(opt.outf),

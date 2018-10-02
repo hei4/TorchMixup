@@ -63,7 +63,7 @@ def main():
     netD.apply(weights_init)
     print(netD)
 
-    criterion = nn.MSELoss()    # criterion = nn.BCELoss()
+    criterion = nn.BCEWithLogitsLoss()
 
     fixed_noise = torch.randn(batch_size, nz, 1, 1, device=device)
 
